@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Digital Twin — Comparison Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: #0a0f1e;
+      color: #e0e6f0;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(30, 100, 200, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30, 100, 200, 0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: rgba(10, 15, 30, 0.95);
+      border-bottom: 1px solid rgba(50, 120, 255, 0.15);
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .nav-brand span { font-size: 24px; }
+
+    .nav-links {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-link {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #6b82a8;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .nav-link:hover  { background: rgba(255,255,255,0.06); color: #fff; }
+    .nav-link.active { background: rgba(30,100,255,0.15);  color: #4d8fff; }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid rgba(255,80,80,0.3);
+      border-radius: 8px;
+      padding: 8px 16px;
+      color: #ff6b6b;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-logout:hover { background: rgba(255,80,80,0.1); }
+
+    /* ── Main ── */
+    .main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 32px;
+    }
+
+    .page-header {
+      margin-bottom: 32px;
+    }
+
+    .page-header h2 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+
+    .page-header p {
+      font-size: 14px;
+      color: #6b82a8;
+    }
+
+    /* ── No Data State ── */
+    .no-data {
+      background: rgba(15, 25, 50, 0.8);
+      border: 1px dashed rgba(50,120,255,0.2);
+      border-radius: 16px;
+      padding: 80px;
+      text-align: center;
+    }
+
+    .no-data p {
+      color: #6b82a8;
+      font-size: 15px;
+      margin-bottom: 20px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #1e64ff, #0a3db5);
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: opacity 0.2s;
+    }
+
+    .btn-primary:hover { opacity: 0.85; }
+
+    /* ── Mode Toggle ── */
+    .mode-toggle {
+      display: flex;
+      gap: 8px;
+      background: rgba(15,25,50,0.8);
+      border: 1px solid rgba(50,120,255,0.15);
+      border-radius: 10px;
+      padding: 6px;
+      margin-bottom: 28px;
+      width: fit-content;
+    }
+
+    .mode-btn {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: transparent;
+      color: #6b82a8;
+    }
+
+    .mode-btn.active {
+      background: linear-gradient(135deg, #1e64ff, #0a3db5);
+      color: white;
+      box-shadow: 0 2px 12px rgba(30,100,255,0.3);
+    }
+
+    /* ── Patient + Best Treatment Banner ── */
+    .top-banner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+
+    .banner-card {
+      background: rgba(15,25,50,0.8);
+      border: 1px solid rgba(50,120,255,0.15);
+      border-radius: 12px;
+      padding: 20px 24px;
+    }
+
+    .banner-card.winner {
+      border-color: rgba(30,200,100,0.3);
+      background: rgba(30,200,100,0.04);
+    }
+
+    .banner-card h4 {
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b82a8;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .banner-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .banner-card p {
+      font-size: 13px;
+      color: #6b82a8;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15,25,50,0.8);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: #a0b0cc;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .legend-item:hover {
+      border-color: rgba(50,120,255,0.3);
+    }
+
+    .legend-item.muted {
+      opacity: 0.4;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Charts Grid ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .chart-card {
+      background: rgba(15,25,50,0.8);
+      border: 1px solid rgba(50,120,255,0.15);
+      border-radius: 16px;
+      padding: 24px;
+    }
+
+    .chart-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .chart-card p {
+      font-size: 12px;
+      color: #6b82a8;
+      margin-bottom: 20px;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 220px;
+    }
+
+    /* ── Summary Table ── */
+    .summary-section {
+      background: rgba(15,25,50,0.8);
+      border: 1px solid rgba(50,120,255,0.15);
+      border-radius: 16px;
+      padding: 28px;
+    }
+
+    .summary-section h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 20px;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .summary-table th {
+      text-align: left;
+      padding: 10px 14px;
+      background: rgba(30,100,255,0.08);
+      color: #6b82a8;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .summary-table th:first-child { border-radius: 6px 0 0 6px; }
+    .summary-table th:last-child  { border-radius: 0 6px 6px 0; }
+
+    .summary-table td {
+      padding: 14px;
+      color: #a0b0cc;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .summary-table tr:last-child td { border-bottom: none; }
+    .summary-table tr:hover td { background: rgba(30,100,255,0.04); }
+
+    .rank-num {
+      display: inline-flex;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .rn-1 { background: rgba(30,200,100,0.2);  color: #4dcc88; }
+    .rn-2 { background: rgba(30,100,255,0.15); color: #4d8fff; }
+    .rn-3 { background: rgba(255,180,50,0.15); color: #ffb84d; }
+    .rn-4 { background: rgba(255,80,80,0.15);  color: #ff6b6b; }
+
+    .rec-yes { color: #4dcc88; font-weight: 600; }
+    .rec-no  { color: #ff6b6b; font-weight: 600; }
+
+    .bar-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 5px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 3px;
+      overflow: hidden;
+      max-width: 80px;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #1e64ff, #4d8fff);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Navbar ── -->
+  <nav class="navbar">
+    <a class="nav-brand" href="dashboard.html">
+      <span>🧬</span> Digital Twin
+    </a>
+    <div class="nav-links">
+      <a class="nav-link"        href="dashboard.html">Dashboard</a>
+      <a class="nav-link"        href="patient.html">Patients</a>
+      <a class="nav-link"        href="simulation.html">Simulation</a>
+      <a class="nav-link active" href="comparison.html">Comparison</a>
+    </div>
+    <button class="btn-logout" onclick="logout()">Sign Out</button>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <div class="page-header">
+      <h2>Visual Comparison Dashboard</h2>
+      <p>Compare treatment trajectories across all projected vitals.</p>
+    </div>
+
+    <!-- No data state -->
+    <div id="noData" class="no-data" style="display:none">
+      <p>No simulation results found. Run a simulation first.</p>
+      <a class="btn-primary" href="simulation.html">← Run Simulation</a>
+    </div>
+
+    <!-- Dashboard content -->
+    <div id="dashContent" style="display:none">
+
+      <!-- Mode Toggle -->
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="modeBtnBest"
+          onclick="switchMode('best')">
+          Best vs No Treatment
+        </button>
+        <button class="mode-btn" id="modeBtnAll"
+          onclick="switchMode('all')">
+          All Treatments
+        </button>
+      </div>
+
+      <!-- Top Banner -->
+      <div class="top-banner">
+        <div class="banner-card">
+          <h4>Patient</h4>
+          <h3 id="bannerPatient">—</h3>
+          <p id="bannerCondition">—</p>
+        </div>
+        <div class="banner-card winner">
+          <h4>⭐ Top Recommendation</h4>
+          <h3 id="bannerBest">—</h3>
+          <p id="bannerImprovement">—</p>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="legend" id="legend"></div>
+
+      <!-- Charts Grid -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h4>Blood Pressure</h4>
+          <p>Projected mmHg over 6 months</p>
+          <div class="chart-wrapper">
+            <canvas id="chartBP"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h4>Glucose</h4>
+          <p>Projected mg/dL over 6 months</p>
+          <div class="chart-wrapper">
+            <canvas id="chartGlucose"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h4>Heart Rate</h4>
+          <p>Projected BPM over 6 months</p>
+          <div class="chart-wrapper">
+            <canvas id="chartHR"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h4>Inflammation</h4>
+          <p>Projected marker over 6 months</p>
+          <div class="chart-wrapper">
+            <canvas id="chartInflam"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Table -->
+      <div class="summary-section">
+        <h3>Treatment Comparison Summary</h3>
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Treatment</th>
+              <th>Baseline</th>
+              <th>Month 6</th>
+              <th>Improvement</th>
+              <th>Final Score</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="summaryBody"></tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    const API   = "http://127.0.0.1:8000";
+    const token = localStorage.getItem("dt_token");
+
+    if (!token) window.location.href = "index.html";
+
+    // ── Treatment Colors ──────────────────────────────────────────────────────
+    const COLORS = {
+      medication_a:      { line: "#4dcc88", bg: "rgba(77,204,136,0.12)"  },
+      medication_b:      { line: "#4d8fff", bg: "rgba(77,143,255,0.12)"  },
+      lifestyle_changes: { line: "#ffb84d", bg: "rgba(255,184,77,0.12)"  },
+      no_treatment:      { line: "#ff6b6b", bg: "rgba(255,107,107,0.12)" },
+    }
+
+    function getColor(treatment) {
+      const key = treatment.toLowerCase().replace(/ /g, "_");
+      return COLORS[key] || { line: "#a0b0cc", bg: "rgba(160,176,204,0.1)" };
+    }
+
+    let allResults    = [];
+    let currentMode   = "best";
+    let charts        = {};
+    let hiddenSeries  = new Set();
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    function init() {
+      const raw = localStorage.getItem("dt_simulation_results");
+
+      if (!raw) {
+        document.getElementById("noData").style.display    = "block";
+        document.getElementById("dashContent").style.display = "none";
+        return;
+      }
+
+      allResults = JSON.parse(raw);
+
+      document.getElementById("noData").style.display     = "none";
+      document.getElementById("dashContent").style.display = "block";
+
+      // Patient info
+      const patientId   = localStorage.getItem("dt_patient_id");
+      const patientName = localStorage.getItem("dt_patient_name") || `Patient ${patientId}`;
+      const patientCond = localStorage.getItem("dt_patient_cond") || "—";
+
+      document.getElementById("bannerPatient").textContent    = patientName;
+      document.getElementById("bannerCondition").textContent  = patientCond;
+
+      // Best treatment
+      const best = allResults[0];
+      document.getElementById("bannerBest").textContent =
+        formatName(best.treatment, best);
+      document.getElementById("bannerImprovement").textContent =
+        `Severity: ${best.baseline_severity.toFixed(2)} → ` +
+        `${best.projected_severity.toFixed(2)} ` +
+        `(${(best.improvement * 100).toFixed(1)}% improvement)`;
+
+      buildLegend();
+      buildCharts();
+      buildSummaryTable();
+    }
+
+    // ── Build Legend ──────────────────────────────────────────────────────────
+    function buildLegend() {
+      const legend = document.getElementById("legend");
+
+      legend.innerHTML = allResults.map(r => {
+        const c = getColor(r.treatment);
+        return `
+          <div class="legend-item" id="leg-${r.treatment}"
+            onclick="toggleSeries('${r.treatment}')">
+            <div class="legend-dot" style="background:${c.line}"></div>
+            ${formatName(r.treatment, r)}
+            ${r.rank === 1 ? "⭐" : ""}
+          </div>
+        `;
+      }).join("");
+    }
+
+    // ── Toggle Series ─────────────────────────────────────────────────────────
+    function toggleSeries(treatment) {
+      if (hiddenSeries.has(treatment)) {
+        hiddenSeries.delete(treatment);
+        document.getElementById(`leg-${treatment}`)
+                ?.classList.remove("muted");
+      } else {
+        hiddenSeries.add(treatment);
+        document.getElementById(`leg-${treatment}`)
+                ?.classList.add("muted");
+      }
+      buildCharts();
+    }
+
+    // ── Switch Mode ───────────────────────────────────────────────────────────
+    function switchMode(mode) {
+      currentMode = mode;
+      hiddenSeries.clear();
+
+      document.querySelectorAll(".legend-item")
+              .forEach(el => el.classList.remove("muted"));
+
+      document.getElementById("modeBtnBest")
+              .classList.toggle("active", mode === "best");
+      document.getElementById("modeBtnAll")
+              .classList.toggle("active", mode === "all");
+
+      buildLegend();
+      buildCharts();
+    }
+
+    // ── Build Charts ──────────────────────────────────────────────────────────
+    function buildCharts() {
+
+      // Decide which treatments to show
+      let toShow = allResults;
+      if (currentMode === "best") {
+        toShow = allResults.filter(r =>
+          r.rank === 1 ||
+          r.treatment.toLowerCase().includes("no_treatment")
+        );
+      }
+
+      toShow = toShow.filter(r => !hiddenSeries.has(r.treatment));
+
+      const labels = ["M1", "M2", "M3", "M4", "M5", "M6"];
+
+      // Helper to extract vital series
+      function series(vital) {
+        return toShow.map(r => {
+          const c = getColor(r.treatment);
+          return {
+            label:           formatName(r.treatment, r),
+            data:            r.projected_vitals.map(v => v[vital]),
+            borderColor:     c.line,
+            backgroundColor: c.bg,
+            borderWidth:     r.rank === 1 ? 3 : 2,
+            pointRadius:     3,
+            pointHoverRadius: 5,
+            tension:         0.4,
+            fill:            r.rank === 1,
+          };
+        });
+      }
+
+      // Chart config
+      const chartOpts = (unit) => ({
+        responsive:          true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "rgba(10,15,30,0.95)",
+            borderColor:     "rgba(50,120,255,0.2)",
+            borderWidth:     1,
+            titleColor:      "#ffffff",
+            bodyColor:       "#a0b0cc",
+            padding:         12,
+            callbacks: {
+              label: ctx =>
+                ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} ${unit}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid:  { color: "rgba(255,255,255,0.04)" },
+            ticks: { color: "#6b82a8", font: { size: 11 } }
+          },
+          y: {
+            grid:  { color: "rgba(255,255,255,0.04)" },
+            ticks: { color: "#6b82a8", font: { size: 11 } }
+          }
+        }
+      });
+
+      // Destroy and rebuild each chart
+      const chartDefs = [
+        { id: "chartBP",     vital: "blood_pressure", unit: "mmHg" },
+        { id: "chartGlucose",vital: "glucose",         unit: "mg/dL" },
+        { id: "chartHR",     vital: "heart_rate",      unit: "BPM" },
+        { id: "chartInflam", vital: "inflammation",    unit: "" },
+      ];
+
+      chartDefs.forEach(({ id, vital, unit }) => {
+        if (charts[id]) charts[id].destroy();
+
+        charts[id] = new Chart(
+          document.getElementById(id),
+          {
+            type: "line",
+            data: { labels, datasets: series(vital) },
+            options: chartOpts(unit)
+          }
+        );
+      });
+    }
+
+    // ── Build Summary Table ───────────────────────────────────────────────────
+    function buildSummaryTable() {
+      const tbody = document.getElementById("summaryBody");
+      const max   = Math.max(...allResults.map(r => r.final_score));
+
+      tbody.innerHTML = allResults.map(r => `
+        <tr>
+          <td>
+            <span class="rank-num rn-${r.rank}">${r.rank}</span>
+          </td>
+          <td style="color:#ffffff;font-weight:600">
+            ${formatName(r.treatment, r)}
+          </td>
+          <td>${r.baseline_severity.toFixed(3)}</td>
+          <td>${r.projected_severity.toFixed(3)}</td>
+          <td style="color:${r.improvement > 0 ? '#4dcc88' : '#ff6b6b'}">
+            ${r.improvement > 0 ? "▼" : "▲"}
+            ${Math.abs(r.improvement * 100).toFixed(1)}%
+          </td>
+          <td>
+            <div class="bar-inline">
+              <span style="color:#ffffff;font-weight:700">
+                ${r.final_score.toFixed(3)}
+              </span>
+              <div class="bar-track">
+                <div class="bar-fill"
+                  style="width:${(r.final_score/max*100).toFixed(0)}%">
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="${r.recommendation === 'Recommended' ? 'rec-yes' : 'rec-no'}">
+            ${r.recommendation === 'Recommended' ? '✓ Recommended' : '✗ Not Recommended'}
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    // Uses display_name from backend (treatment_config.py) if available,
+    // otherwise formats the internal key as a fallback
+    function formatName(t, resultObj) {
+      if (resultObj && resultObj.display_name) return resultObj.display_name;
+      return t.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function logout() {
+      localStorage.removeItem("dt_token");
+      localStorage.removeItem("dt_user");
+      window.location.href = "index.html";
+    }
+
+    // ── Run ───────────────────────────────────────────────────────────────────
+    init();
+  </script>
+
+</body>
+</html>
