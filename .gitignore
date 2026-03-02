@@ -1,0 +1,31 @@
+# Python virtual environment — never push this
+.venv/
+venv/
+env/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Trained model files — too large for GitHub
+models/lstm_model.keras
+models/scaler.pkl
+
+# Database file — contains patient data
+digital_twin.db
+
+# Raw patient data from Member 1
+data/raw/
+
+# Environment variables
+.env
+
+# PyCharm project files
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
