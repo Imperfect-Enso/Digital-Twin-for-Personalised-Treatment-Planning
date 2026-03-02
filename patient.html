@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Digital Twin — Patient Overview</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: #0a0f1e;
+      color: #e0e6f0;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(30,100,200,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30,100,200,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: rgba(10,15,30,0.95);
+      border-bottom: 1px solid rgba(50,120,255,0.15);
+      padding: 0 32px; height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .nav-brand { display:flex; align-items:center; gap:10px; font-size:18px; font-weight:700; color:#fff; text-decoration:none; }
+    .nav-brand span { font-size:24px; }
+    .nav-links { display:flex; gap:8px; }
+    .nav-link { padding:8px 16px; border-radius:8px; font-size:13px; color:#6b82a8; text-decoration:none; transition:all 0.2s; }
+    .nav-link:hover { background:rgba(255,255,255,0.06); color:#fff; }
+    .nav-link.active { background:rgba(30,100,255,0.15); color:#4d8fff; }
+    .nav-right { display:flex; align-items:center; gap:12px; }
+    .btn-logout { background:transparent; border:1px solid rgba(255,80,80,0.3); border-radius:8px; padding:8px 16px; color:#ff6b6b; font-size:13px; cursor:pointer; transition:all 0.2s; }
+    .btn-logout:hover { background:rgba(255,80,80,0.1); }
+
+    /* ── Main ── */
+    .main { max-width: 1280px; margin: 0 auto; padding: 40px 32px; }
+
+    .page-header { margin-bottom: 32px; }
+    .page-header h2 { font-size:26px; font-weight:700; color:#fff; margin-bottom:6px; }
+    .page-header p  { font-size:14px; color:#6b82a8; }
+
+    /* ── Patient Grid ── */
+    .patient-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:32px; }
+
+    .patient-card {
+      background:rgba(15,25,50,0.8); border:1px solid rgba(50,120,255,0.15);
+      border-radius:12px; padding:20px 16px; cursor:pointer; transition:all 0.2s; text-align:center;
+    }
+    .patient-card:hover { border-color:rgba(50,120,255,0.5); transform:translateY(-2px); box-shadow:0 8px 24px rgba(30,100,255,0.15); }
+    .patient-card.selected { border-color:#1e64ff; background:rgba(30,100,255,0.1); box-shadow:0 0 0 2px rgba(30,100,255,0.3); }
+    .patient-avatar { font-size:32px; margin-bottom:10px; }
+    .patient-card h4 { font-size:13px; font-weight:600; color:#fff; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .patient-card p  { font-size:11px; color:#6b82a8; }
+    .patient-id-badge { display:inline-block; background:rgba(30,100,255,0.15); color:#4d8fff; border-radius:20px; padding:2px 8px; font-size:10px; font-weight:700; margin-bottom:8px; }
+
+    .skeleton { background:rgba(15,25,50,0.8); border:1px solid rgba(50,120,255,0.1); border-radius:12px; height:120px; animation:pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.8} }
+
+    /* ── Detail Panel ── */
+    .detail-panel { display:none; }
+    .detail-panel.visible { display:block; }
+
+    /* Header row: identity + severity */
+    .detail-header {
+      display:flex; align-items:flex-start; justify-content:space-between;
+      margin-bottom:24px; flex-wrap:wrap; gap:16px;
+      background:rgba(15,25,50,0.8); border:1px solid rgba(50,120,255,0.2);
+      border-radius:16px; padding:28px 32px;
+    }
+    .detail-identity { display:flex; align-items:center; gap:20px; }
+    .detail-avatar { font-size:56px; width:80px; height:80px; background:rgba(30,100,255,0.1); border-radius:16px; display:flex; align-items:center; justify-content:center; }
+    .detail-name h3 { font-size:22px; font-weight:700; color:#fff; margin-bottom:4px; }
+    .detail-name p  { font-size:14px; color:#6b82a8; margin-bottom:8px; }
+    .condition-badge { display:inline-block; background:rgba(150,50,255,0.15); color:#b06dff; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:600; }
+    .severity-box { background:rgba(10,15,30,0.6); border:1px solid rgba(50,120,255,0.2); border-radius:12px; padding:20px 28px; text-align:center; min-width:160px; }
+    .severity-score { font-size:42px; font-weight:800; line-height:1; margin-bottom:4px; }
+    .score-high{color:#ff6b6b} .score-medium{color:#ffb84d} .score-low{color:#4dcc88}
+    .severity-label { font-size:12px; color:#6b82a8; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+    .risk-badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:.5px; }
+    .risk-high{background:rgba(255,80,80,0.15);color:#ff6b6b} .risk-medium{background:rgba(255,180,50,0.15);color:#ffb84d} .risk-low{background:rgba(50,200,100,0.15);color:#4dcc88}
+
+    /* Stats row */
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+    .stat-box { background:rgba(10,15,30,0.5); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:16px; text-align:center; }
+    .stat-box h4 { font-size:20px; font-weight:700; color:#fff; margin-bottom:4px; }
+    .stat-box p  { font-size:11px; color:#6b82a8; letter-spacing:1px; text-transform:uppercase; }
+
+    /* Interpretation */
+    .section-label { font-size:12px; font-weight:600; color:#6b82a8; letter-spacing:2px; text-transform:uppercase; margin-bottom:14px; }
+    .interpretation { background:rgba(30,100,255,0.06); border-left:3px solid #1e64ff; border-radius:0 8px 8px 0; padding:12px 16px; font-size:13px; color:#a0b0cc; margin-bottom:24px; line-height:1.6; }
+
+    /* ── TWIN + TABLE side-by-side layout ── */
+    .twin-table-row {
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+      align-items: start;
+      min-width: 0;
+    }
+
+    /* ── 3D Twin Container ── */
+    .twin-container {
+      position: relative;
+      width: 100%;
+      height: 480px;
+      background: radial-gradient(ellipse at center, #0a1828 0%, #050a12 80%);
+      border: 1px solid rgba(0,200,255,0.18);
+      border-radius: 16px;
+      overflow: hidden;
+      contain: layout;
+    }
+
+    /* Background grid overlay */
+    .twin-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,200,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,200,255,0.04) 1px, transparent 1px);
+      background-size: 36px 36px;
+      pointer-events: none;
+    }
+
+    /* Horizontal scan line */
+    .scan-line {
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, #00c8ff, transparent);
+      animation: scan 4s linear infinite;
+      opacity: 0.5; pointer-events: none;
+    }
+    @keyframes scan { 0%{top:0%} 100%{top:100%} }
+
+    /* Corner brackets */
+    .twin-corner {
+      position: absolute; width: 18px; height: 18px;
+      border-color: rgba(0,200,255,0.5); border-style: solid;
+      pointer-events: none;
+    }
+    .twin-corner.tl { top:10px; left:10px;  border-width:2px 0 0 2px; }
+    .twin-corner.tr { top:10px; right:10px; border-width:2px 2px 0 0; }
+    .twin-corner.bl { bottom:10px; left:10px;  border-width:0 0 2px 2px; }
+    .twin-corner.br { bottom:10px; right:10px; border-width:0 2px 2px 0; }
+
+    /* Three canvas fills container */
+    #twinCanvas { position:absolute; top:0; left:0; display:block; }
+
+    /* Idle prompt */
+    .twin-idle {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.5s; pointer-events: none;
+    }
+    .twin-idle.hidden { opacity: 0; }
+    .idle-hex {
+      width: 72px; height: 72px; border: 1px solid rgba(0,200,255,0.3);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 14px; font-size: 28px;
+      animation: floatHex 3s ease-in-out infinite;
+    }
+    @keyframes floatHex { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+    .idle-text { font-size: 11px; letter-spacing: 3px; color: rgba(0,200,255,0.4); text-transform: uppercase; }
+
+    /* Top label */
+    .twin-label {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      font-size: 9px; letter-spacing: 4px; color: rgba(0,200,255,0.45);
+      text-transform: uppercase; pointer-events: none;
+    }
+
+    /* Patient name overlay at bottom */
+    .twin-name-overlay {
+      position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+      text-align: center; opacity: 0; transition: opacity 0.8s; pointer-events: none;
+    }
+    .twin-name-overlay.active { opacity: 1; }
+    .twin-name-overlay .tno-name {
+      font-size: 13px; font-weight: 700; color: #00c8ff; letter-spacing: 3px;
+      text-shadow: 0 0 16px rgba(0,200,255,0.5); text-transform: uppercase;
+    }
+    .twin-name-overlay .tno-id { font-size: 9px; color: rgba(0,200,255,0.45); letter-spacing: 2px; margin-top: 3px; }
+
+    /* Hotspot badges */
+    .hotspot-layer { position:absolute; inset:0; pointer-events:none; }
+    .hotspot {
+      position: absolute; display: flex; align-items: center; gap: 8px;
+      opacity: 0; transition: opacity 0.4s;
+    }
+    .hotspot.active { opacity: 1; }
+    .hs-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; position: relative;
+    }
+    .hs-dot::after {
+      content: ''; position: absolute; inset: -4px; border-radius: 50%;
+      border: 1px solid currentColor; animation: hsRipple 1.6s infinite; opacity: 0.6;
+    }
+    @keyframes hsRipple { 0%{transform:scale(1);opacity:0.6} 100%{transform:scale(2.2);opacity:0} }
+    .hs-badge {
+      background: rgba(5,10,18,0.92); border: 1px solid; border-radius: 4px;
+      padding: 4px 9px; font-size: 10px; font-weight: 600; white-space: nowrap; letter-spacing: .3px;
+    }
+    /* danger */
+    .hs-danger .hs-dot  { background:#ff3355; color:#ff3355; }
+    .hs-danger .hs-badge{ border-color:#ff3355; color:#ff3355; }
+    /* warning */
+    .hs-warn .hs-dot    { background:#ff8c00; color:#ff8c00; }
+    .hs-warn .hs-badge  { border-color:#ff8c00; color:#ff8c00; }
+    /* normal */
+    .hs-ok .hs-dot      { background:#00ff88; color:#00ff88; }
+    .hs-ok .hs-badge    { border-color:#00ff88; color:#00ff88; }
+
+    /* ── Vitals table column ── */
+    .vitals-col {
+      background: rgba(15,25,50,0.8);
+      border: 1px solid rgba(50,120,255,0.15);
+      border-radius: 16px;
+      padding: 22px 24px;
+    }
+
+    .vitals-table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    .vitals-table th {
+      text-align: left; padding: 9px 12px;
+      background: rgba(30,100,255,0.08); color: #6b82a8;
+      font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600;
+    }
+    .vitals-table th:first-child{border-radius:6px 0 0 6px} .vitals-table th:last-child{border-radius:0 6px 6px 0}
+    .vitals-table td { padding: 9px 12px; color: #a0b0cc; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .vitals-table tr:last-child td{border-bottom:none}
+    .vitals-table tr:hover td{background:rgba(30,100,255,0.04)}
+
+    /* Action buttons */
+    .action-buttons { display:flex; gap:12px; flex-wrap:wrap; margin-top: 4px; }
+    .btn-primary { background:linear-gradient(135deg,#1e64ff,#0a3db5); border:none; border-radius:8px; padding:12px 24px; color:white; font-size:14px; font-weight:600; cursor:pointer; transition:opacity 0.2s; text-decoration:none; display:inline-block; }
+    .btn-primary:hover{opacity:.85}
+    .btn-secondary { background:transparent; border:1px solid rgba(50,120,255,0.3); border-radius:8px; padding:12px 24px; color:#4d8fff; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; text-decoration:none; display:inline-block; }
+    .btn-secondary:hover{background:rgba(30,100,255,0.1)}
+    .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.2); border-top-color:white; border-radius:50%; animation:spin .6s linear infinite; vertical-align:middle; margin-right:6px; }
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a class="nav-brand" href="dashboard.html"><span>🧬</span> Digital Twin</a>
+    <div class="nav-links">
+      <a class="nav-link" href="dashboard.html">Dashboard</a>
+      <a class="nav-link active" href="patient.html">Patients</a>
+      <a class="nav-link" href="simulation.html">Simulation</a>
+      <a class="nav-link" href="comparison.html">Comparison</a>
+    </div>
+    <div class="nav-right">
+      <button class="btn-logout" onclick="logout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <div class="page-header">
+      <h2>Patient Overview</h2>
+      <p>Select a patient to view their health profile, digital twin, and severity assessment.</p>
+    </div>
+
+    <!-- Patient picker grid -->
+    <div id="patientGrid" class="patient-grid"></div>
+
+    <!-- Full detail panel -->
+    <div class="detail-panel" id="detailPanel">
+
+      <!-- Identity + severity header -->
+      <div class="detail-header">
+        <div class="detail-identity">
+          <div class="detail-avatar" id="detailAvatar">👤</div>
+          <div class="detail-name">
+            <h3 id="detailName">—</h3>
+            <p id="detailMeta">—</p>
+            <span class="condition-badge" id="detailCondition">—</span>
+          </div>
+        </div>
+        <div class="severity-box">
+          <div class="severity-label">Severity Score</div>
+          <div class="severity-score" id="severityScore">—</div>
+          <span class="risk-badge" id="riskBadge">—</span>
+        </div>
+      </div>
+
+      <!-- Age / Gender / Weight / Height stats -->
+      <div class="stats-row">
+        <div class="stat-box"><h4 id="statAge">—</h4><p>Age</p></div>
+        <div class="stat-box"><h4 id="statGender">—</h4><p>Gender</p></div>
+        <div class="stat-box"><h4 id="statWeight">—</h4><p>Weight (kg)</p></div>
+        <div class="stat-box"><h4 id="statHeight">—</h4><p>Height (cm)</p></div>
+      </div>
+
+      <!-- Clinical interpretation -->
+      <p class="section-label">Clinical Assessment</p>
+      <div class="interpretation" id="interpretation">Loading assessment…</div>
+
+      <!-- 3D Twin + Vitals table, side by side -->
+      <p class="section-label">12-Month Vital History</p>
+      <div class="twin-table-row">
+
+        <!-- ── 3D Digital Twin ── -->
+        <div class="twin-container" id="twinContainer">
+          <div class="twin-grid"></div>
+          <div class="scan-line"></div>
+          <div class="twin-corner tl"></div>
+          <div class="twin-corner tr"></div>
+          <div class="twin-corner bl"></div>
+          <div class="twin-corner br"></div>
+          <canvas id="twinCanvas"></canvas>
+          <div class="twin-label">3D DIGITAL TWIN</div>
+
+          <div class="twin-idle" id="twinIdle">
+            <div class="idle-hex">🧬</div>
+            <div class="idle-text">Awaiting Patient Data</div>
+          </div>
+
+          <!-- Hotspot overlays — updated dynamically -->
+          <div class="hotspot-layer" id="hotspotLayer">
+            <div class="hotspot" id="hs-heart" style="top:30%;left:55%">
+              <div class="hs-dot"></div>
+              <div class="hs-badge" id="hsBP">BP: —</div>
+            </div>
+            <div class="hotspot" id="hs-glucose" style="top:45%;left:16%">
+              <div class="hs-badge" id="hsGlu">Glucose: —</div>
+              <div class="hs-dot"></div>
+            </div>
+            <div class="hotspot" id="hs-hr" style="top:24%;left:18%">
+              <div class="hs-badge" id="hsHR">HR: —</div>
+              <div class="hs-dot"></div>
+            </div>
+            <div class="hotspot" id="hs-inf" style="top:55%;left:54%">
+              <div class="hs-dot"></div>
+              <div class="hs-badge" id="hsInf">Inflam: —</div>
+            </div>
+          </div>
+
+          <div class="twin-name-overlay" id="twinNameOverlay">
+            <div class="tno-name" id="tnoName">—</div>
+            <div class="tno-id"   id="tnoId">—</div>
+          </div>
+        </div>
+
+        <!-- ── Vitals table ── -->
+        <div class="vitals-col">
+          <table class="vitals-table">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Blood Pressure</th>
+                <th>Glucose</th>
+                <th>Heart Rate</th>
+                <th>Inflammation</th>
+              </tr>
+            </thead>
+            <tbody id="vitalsBody">
+              <tr><td colspan="5" style="text-align:center;color:#3a4a6a">
+                Select a patient to view vitals
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div><!-- end twin-table-row -->
+
+      <!-- Action buttons -->
+      <div class="action-buttons">
+        <a class="btn-primary" href="simulation.html">💊 Run Treatment Simulation</a>
+        <a class="btn-secondary" href="comparison.html">📊 View Comparison Dashboard</a>
+      </div>
+
+    </div><!-- end detail-panel -->
+
+  </main>
+
+
+  <script>
+  // ═══════════════════════════════════════════════════════════
+  // AUTH
+  // ═══════════════════════════════════════════════════════════
+  const API   = "http://127.0.0.1:8000";
+  const token = localStorage.getItem("dt_token");
+  if (!token) window.location.href = "index.html";
+
+  function logout() {
+    localStorage.removeItem("dt_token");
+    localStorage.removeItem("dt_user");
+    window.location.href = "index.html";
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // THREE.JS — Digital Twin 3D Model
+  // ═══════════════════════════════════════════════════════════
+  const twinCanvas    = document.getElementById("twinCanvas");
+  const twinContainer = document.getElementById("twinContainer");
+
+  const renderer = new THREE.WebGLRenderer({ canvas: twinCanvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setClearColor(0x000000, 0);
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 0.1, 5.2);
+
+  // ── Lighting ──────────────────────────────────────────────
+  scene.add(new THREE.AmbientLight(0x112233, 2.5));
+
+  const cyanLight = new THREE.PointLight(0x00c8ff, 3.5, 20);
+  cyanLight.position.set(-3, 3, 3);
+  scene.add(cyanLight);
+
+  const greenLight = new THREE.PointLight(0x00ff88, 1.5, 20);
+  greenLight.position.set(3, -2, 2);
+  scene.add(greenLight);
+
+  const rimLight = new THREE.PointLight(0xff3355, 1.5, 12);
+  rimLight.position.set(0, 2, -3);
+  scene.add(rimLight);
+
+  // ── Human figure group ────────────────────────────────────
+  const humanGroup = new THREE.Group();
+  scene.add(humanGroup);
+
+  // Base materials — every part gets its own clone for independent opacity animation
+  const solidBase = new THREE.MeshStandardMaterial({
+    color: 0x0a2040, emissive: 0x001828, metalness: 0.2, roughness: 0.75,
+    transparent: true, opacity: 0
+  });
+  const wireBase = new THREE.MeshBasicMaterial({
+    color: 0x00c8ff, wireframe: true, transparent: true, opacity: 0
+  });
+
+  // All body part meshes stored here for fade-in
+  const bodyParts = [];
+
+  function addPart(geo, x, y, z, sx=1, sy=1, sz=1) {
+    const s = new THREE.Mesh(geo, solidBase.clone());
+    const w = new THREE.Mesh(geo, wireBase.clone());
+    s.position.set(x,y,z); s.scale.set(sx,sy,sz);
+    w.position.set(x,y,z); w.scale.set(sx,sy,sz);
+    humanGroup.add(s, w);
+    bodyParts.push({ solid: s, wire: w });
+    return { solid: s, wire: w };
+  }
+
+  // ── Body segments ─────────────────────────────────────────
+  addPart(new THREE.SphereGeometry(0.185, 18, 18),           0,    1.56, 0); // head
+  addPart(new THREE.CylinderGeometry(0.07, 0.095, 0.18, 10), 0,    1.34, 0); // neck
+  addPart(new THREE.CylinderGeometry(0.29,  0.22,  0.72, 14), 0,    0.85, 0); // torso
+  addPart(new THREE.CylinderGeometry(0.22,  0.18,  0.30, 14), 0,    0.35, 0); // hips
+  addPart(new THREE.SphereGeometry(0.08, 10, 10),            -0.35, 1.05, 0); // L shoulder
+  addPart(new THREE.SphereGeometry(0.08, 10, 10),             0.35, 1.05, 0); // R shoulder
+  addPart(new THREE.CylinderGeometry(0.065, 0.055, 0.40, 10),-0.38, 0.79, 0); // L upper arm
+  addPart(new THREE.CylinderGeometry(0.055, 0.045, 0.36, 10),-0.42, 0.50, 0); // L lower arm
+  addPart(new THREE.SphereGeometry(0.055, 8, 8),             -0.44, 0.29, 0); // L hand
+  addPart(new THREE.CylinderGeometry(0.065, 0.055, 0.40, 10), 0.38, 0.79, 0); // R upper arm
+  addPart(new THREE.CylinderGeometry(0.055, 0.045, 0.36, 10), 0.42, 0.50, 0); // R lower arm
+  addPart(new THREE.SphereGeometry(0.055, 8, 8),              0.44, 0.29, 0); // R hand
+  addPart(new THREE.CylinderGeometry(0.10,  0.082, 0.54, 12),-0.14,-0.08, 0); // L upper leg
+  addPart(new THREE.CylinderGeometry(0.078, 0.062, 0.50, 12),-0.15,-0.62, 0); // L lower leg
+  addPart(new THREE.BoxGeometry(0.12, 0.06, 0.22),           -0.15,-0.91, 0.06); // L foot
+  addPart(new THREE.CylinderGeometry(0.10,  0.082, 0.54, 12), 0.14,-0.08, 0); // R upper leg
+  addPart(new THREE.CylinderGeometry(0.078, 0.062, 0.50, 12), 0.15,-0.62, 0); // R lower leg
+  addPart(new THREE.BoxGeometry(0.12, 0.06, 0.22),            0.15,-0.91, 0.06); // R foot
+
+  // ── Organ glow meshes ─────────────────────────────────────
+  // Heart
+  const heartMat = new THREE.MeshStandardMaterial({
+    color: 0xff3355, emissive: 0xff0022, emissiveIntensity: 2.5,
+    transparent: true, opacity: 0
+  });
+  const heartMesh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 12), heartMat);
+  heartMesh.position.set(-0.09, 0.96, 0.22);
+  humanGroup.add(heartMesh);
+
+  // Kidney / glucose
+  const glucoseMat = new THREE.MeshStandardMaterial({
+    color: 0xff8c00, emissive: 0xff6000, emissiveIntensity: 2.0,
+    transparent: true, opacity: 0
+  });
+  const glucoseMesh = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), glucoseMat);
+  glucoseMesh.position.set(0.13, 0.70, 0.20);
+  humanGroup.add(glucoseMesh);
+
+  // Lungs / inflammation — subtle blue
+  const infMat = new THREE.MeshStandardMaterial({
+    color: 0x00c8ff, emissive: 0x0088cc, emissiveIntensity: 1.5,
+    transparent: true, opacity: 0
+  });
+  const infMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 10), infMat);
+  infMesh.position.set(-0.18, 0.88, 0.15);
+  humanGroup.add(infMesh);
+
+  humanGroup.position.y = -0.28;
+  humanGroup.scale.setScalar(1.28);
+
+  // ── Resize handler ────────────────────────────────────────
+  function resizeTwin() {
+    const w = twinContainer.offsetWidth  || 400;
+    const h = twinContainer.offsetHeight || 480;
+    renderer.setSize(w, h, false);
+    twinCanvas.style.width  = w + "px";
+    twinCanvas.style.height = h + "px";
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  // Defer initial sizing so the DOM has fully painted
+  setTimeout(resizeTwin, 50);
+  window.addEventListener("resize", resizeTwin);
+
+  // ── Animation loop ────────────────────────────────────────
+  let rotY = 0;
+  let breathPhase = 0;
+  let twinActive = false;
+
+  let sizedOnce = false;
+  function animateLoop() {
+    requestAnimationFrame(animateLoop);
+
+    // Self-heal: if container is visible but renderer hasn't been sized yet, fix it
+    if (!sizedOnce && twinContainer.offsetWidth > 0) {
+      resizeTwin();
+      sizedOnce = true;
+    }
+
+    rotY += 0.0038;
+    humanGroup.rotation.y = rotY;
+
+    if (twinActive) {
+      breathPhase += 0.028;
+      const br = 1 + Math.sin(breathPhase) * 0.013;
+      humanGroup.scale.setScalar(1.28 * br);
+
+      // Heartbeat pulse
+      const hb = 1 + Math.abs(Math.sin(breathPhase * 1.3)) * 0.28;
+      heartMesh.scale.setScalar(hb);
+
+      // Subtle glucose pulse
+      const gp = 1 + Math.sin(breathPhase * 0.7) * 0.12;
+      glucoseMesh.scale.setScalar(gp);
+    }
+
+    renderer.render(scene, camera);
+  }
+  animateLoop();
+
+  // ── Opacity tween ─────────────────────────────────────────
+  function tweenOpacity(mat, target, steps = 30) {
+    const start = mat.opacity;
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      mat.opacity = start + (target - start) * (i / steps);
+      if (i >= steps) clearInterval(iv);
+    }, 16);
+  }
+
+  // ── Activate twin with patient data ───────────────────────
+  function activateTwin(profile, vitals, severity) {
+    twinActive = true;
+
+    // Hide idle prompt
+    document.getElementById("twinIdle").classList.add("hidden");
+
+    // Stagger body parts fade-in
+    bodyParts.forEach(({ solid, wire }, idx) => {
+      setTimeout(() => {
+        tweenOpacity(solid.material, 0.78);
+        tweenOpacity(wire.material, 0.13);
+      }, idx * 45);
+    });
+
+    // Determine organ intensities from severity
+    const highSev  = severity > 0.6;
+    const medSev   = severity > 0.3;
+    const heartCol = highSev ? 0xff3355 : medSev ? 0xff8c00 : 0x00ff88;
+    heartMat.color.setHex(heartCol);
+    heartMat.emissive.setHex(heartCol);
+
+    setTimeout(() => {
+      tweenOpacity(heartMat,   0.92);
+      tweenOpacity(glucoseMat, 0.75);
+      tweenOpacity(infMat,     0.55);
+    }, 700);
+
+    // Update hotspot content and severity class
+    const lastV  = vitals[vitals.length - 1];
+    const bpVal  = lastV.blood_pressure;
+    const gluVal = lastV.glucose;
+    const hrVal  = lastV.heart_rate;
+    const infVal = lastV.inflammation;
+
+    // Blood pressure hotspot
+    const hsBP = document.getElementById("hs-heart");
+    const bpHigh = bpVal > 140;
+    hsBP.className = `hotspot ${bpHigh ? "hs-danger" : "hs-ok"}`;
+    document.getElementById("hsBP").textContent = `BP: ${bpVal} mmHg`;
+
+    // Glucose hotspot
+    const hsGlu = document.getElementById("hs-glucose");
+    const gluHigh = gluVal > 160;
+    hsGlu.className = `hotspot ${gluHigh ? "hs-warn" : "hs-ok"}`;
+    document.getElementById("hsGlu").textContent = `Glucose: ${gluVal} mg/dL`;
+
+    // Heart rate hotspot
+    const hsHR = document.getElementById("hs-hr");
+    const hrHigh = hrVal > 100 || hrVal < 50;
+    hsHR.className = `hotspot ${hrHigh ? "hs-warn" : "hs-ok"}`;
+    document.getElementById("hsHR").textContent = `HR: ${hrVal} BPM`;
+
+    // Inflammation hotspot
+    const hsInf = document.getElementById("hs-inf");
+    const infHigh = infVal > 1.5;
+    hsInf.className = `hotspot ${infHigh ? "hs-danger" : infVal > 0.8 ? "hs-warn" : "hs-ok"}`;
+    document.getElementById("hsInf").textContent = `Inflam: ${infVal}`;
+
+    // Stagger hotspot appearance
+    setTimeout(() => {
+      ["hs-heart","hs-glucose","hs-hr","hs-inf"].forEach((id, i) => {
+        setTimeout(() => document.getElementById(id).classList.add("active"), i * 180);
+      });
+    }, 950);
+
+    // Name overlay
+    document.getElementById("tnoName").textContent = profile.name.toUpperCase();
+    document.getElementById("tnoId").textContent   =
+      `ID #${String(profile.patient_id).padStart(4,"0")} · ${profile.med_condition}`;
+    setTimeout(() => {
+      document.getElementById("twinNameOverlay").classList.add("active");
+    }, 1300);
+  }
+
+  // ── Reset twin (new patient selected) ─────────────────────
+  function resetTwin() {
+    twinActive = false;
+    bodyParts.forEach(({ solid, wire }) => {
+      solid.material.opacity = 0;
+      wire.material.opacity  = 0;
+    });
+    heartMat.opacity   = 0;
+    glucoseMat.opacity = 0;
+    infMat.opacity     = 0;
+    heartMesh.scale.setScalar(1);
+    document.querySelectorAll(".hotspot").forEach(h => h.classList.remove("active"));
+    document.getElementById("twinNameOverlay").classList.remove("active");
+    document.getElementById("twinIdle").classList.remove("hidden");
+  }
+
+
+  // ═══════════════════════════════════════════════════════════
+  // PATIENT LOGIC
+  // ═══════════════════════════════════════════════════════════
+  let selectedPatientId = null;
+
+  async function loadPatients() {
+    const grid = document.getElementById("patientGrid");
+    grid.innerHTML = Array(10).fill('<div class="skeleton"></div>').join("");
+    try {
+      const res  = await fetch(`${API}/patient/list`, { headers: { "Authorization": `Bearer ${token}` } });
+      const data = await res.json();
+      grid.innerHTML = data.patients.map(p => `
+        <div class="patient-card" id="card-${p.patient_id}" onclick="selectPatient(${p.patient_id})">
+          <div class="patient-avatar">${p.gender === "M" ? "👨‍⚕️" : "👩‍⚕️"}</div>
+          <div class="patient-id-badge">ID ${p.patient_id}</div>
+          <h4>${p.name}</h4>
+          <p>${p.age}y · ${p.gender}</p>
+          <p style="margin-top:4px;font-size:10px">${p.med_condition}</p>
+        </div>`).join("");
+      const saved = localStorage.getItem("dt_patient_id");
+      if (saved) selectPatient(parseInt(saved));
+    } catch (err) {
+      grid.innerHTML = `<div style="grid-column:span 5;text-align:center;color:#ff6b6b;padding:40px">Could not load patients — is the API running?</div>`;
+    }
+  }
+
+  async function selectPatient(patientId) {
+    document.querySelectorAll(".patient-card").forEach(c => c.classList.remove("selected"));
+    document.getElementById(`card-${patientId}`)?.classList.add("selected");
+    selectedPatientId = patientId;
+    localStorage.setItem("dt_patient_id", patientId);
+
+    const panel = document.getElementById("detailPanel");
+    panel.classList.add("visible");
+    // Re-measure now the panel is displayed
+    setTimeout(resizeTwin, 10);
+
+    // Reset twin for fresh animation
+    resetTwin();
+
+    document.getElementById("severityScore").textContent = "…";
+    document.getElementById("vitalsBody").innerHTML =
+      `<tr><td colspan="5" style="text-align:center;color:#3a4a6a"><span class="spinner"></span> Loading vitals…</td></tr>`;
+    document.getElementById("interpretation").textContent = "Loading assessment…";
+
+    try {
+      const profile = await fetch(`${API}/patient/${patientId}/profile`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      }).then(r => r.json());
+
+      // Save for other pages
+      localStorage.setItem("dt_patient_name", profile.name);
+      localStorage.setItem("dt_patient_cond", profile.med_condition);
+
+      // Populate header
+      document.getElementById("detailAvatar").textContent  = profile.gender === "M" ? "👨‍⚕️" : "👩‍⚕️";
+      document.getElementById("detailName").textContent    = profile.name;
+      document.getElementById("detailMeta").textContent    = `Patient ID: ${profile.patient_id}`;
+      document.getElementById("detailCondition").textContent = profile.med_condition;
+      document.getElementById("statAge").textContent       = profile.age;
+      document.getElementById("statGender").textContent    = profile.gender === "M" ? "Male" : "Female";
+      document.getElementById("statWeight").textContent    = profile.weight;
+      document.getElementById("statHeight").textContent    = profile.height;
+
+      // Vitals table
+      document.getElementById("vitalsBody").innerHTML =
+        profile.vital_history.map(v => `
+          <tr>
+            <td style="color:#4d8fff;font-weight:600">Month ${v.timestep + 1}</td>
+            <td>${v.blood_pressure} mmHg</td>
+            <td>${v.glucose} mg/dL</td>
+            <td>${v.heart_rate} BPM</td>
+            <td>${v.inflammation}</td>
+          </tr>`).join("");
+
+      // Prognosis (ML)
+      const prognosis = await fetch(`${API}/patient/prognosis`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ patient_id: patientId, vitals_history: profile.vital_history })
+      }).then(r => r.json());
+
+      const score   = prognosis.severity_score;
+      const scoreEl = document.getElementById("severityScore");
+      scoreEl.textContent = score.toFixed(2);
+      scoreEl.className   = "severity-score " + (score > 0.6 ? "score-high" : score > 0.3 ? "score-medium" : "score-low");
+      const badgeEl = document.getElementById("riskBadge");
+      badgeEl.textContent = prognosis.risk_level;
+      badgeEl.className   = "risk-badge "      + (score > 0.6 ? "risk-high"  : score > 0.3 ? "risk-medium"  : "risk-low");
+      document.getElementById("interpretation").textContent = prognosis.interpretation;
+
+      // Fire up the 3D twin now that we have all data
+      activateTwin(profile, profile.vital_history, score);
+
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    } catch (err) {
+      document.getElementById("interpretation").textContent = "Could not load patient data.";
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────
+  loadPatients();
+  </script>
+
+</body>
+</html>

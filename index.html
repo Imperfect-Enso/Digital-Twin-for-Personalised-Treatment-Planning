@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Digital Twin — Login</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #0a0f1e;
+      color: #e0e6f0;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Background grid effect ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(30, 100, 200, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30, 100, 200, 0.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .login-container {
+      background: rgba(15, 25, 50, 0.9);
+      border: 1px solid rgba(50, 120, 255, 0.2);
+      border-radius: 16px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 420px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 0 60px rgba(30, 100, 255, 0.1);
+    }
+
+    /* ── Logo / Title ── */
+    .logo {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .logo-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .logo h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 1px;
+    }
+
+    .logo p {
+      font-size: 13px;
+      color: #6b82a8;
+      margin-top: 6px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Form ── */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b82a8;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(50, 120, 255, 0.2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #e0e6f0;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus {
+      border-color: rgba(50, 120, 255, 0.6);
+      box-shadow: 0 0 0 3px rgba(50, 120, 255, 0.1);
+    }
+
+    input::placeholder {
+      color: #3a4a6a;
+    }
+
+    /* ── Button ── */
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #1e64ff, #0a3db5);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      margin-top: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn-login:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-login:active {
+      transform: translateY(0);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ── Error message ── */
+    .error-msg {
+      background: rgba(255, 60, 60, 0.1);
+      border: 1px solid rgba(255, 60, 60, 0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #ff6b6b;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* ── Demo credentials hint ── */
+    .demo-hint {
+      text-align: center;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .demo-hint p {
+      font-size: 12px;
+      color: #3a4a6a;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .demo-hint code {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #6b82a8;
+      display: inline-block;
+      margin: 2px;
+    }
+
+    /* ── Loading spinner inside button ── */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+
+    <div class="logo">
+      <div class="logo-icon">🧬</div>
+      <h1>Digital Twin</h1>
+      <p>Personalized Treatment Planning</p>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="form-group">
+      <label for="username">Username</label>
+      <input
+        type="text"
+        id="username"
+        placeholder="Enter your username"
+        autocomplete="username"
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input
+        type="password"
+        id="password"
+        placeholder="Enter your password"
+        autocomplete="current-password"
+      />
+    </div>
+
+    <button class="btn-login" id="loginBtn" onclick="handleLogin()">
+      Sign In
+    </button>
+
+    <div class="demo-hint">
+      <p>Demo Credentials</p>
+      <code>doctor</code>
+      <code>password123</code>
+    </div>
+
+  </div>
+
+  <script>
+    const API = "http://127.0.0.1:8000";
+
+    // ── Clear any old session on login page load ──────────────────────────────
+    localStorage.removeItem("dt_token");
+    localStorage.removeItem("dt_user");
+
+    // ── Allow Enter key to submit ─────────────────────────────────────────────
+    document.getElementById("password").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleLogin();
+    });
+
+    document.getElementById("username").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleLogin();
+    });
+
+    // ── Login Handler ─────────────────────────────────────────────────────────
+    async function handleLogin() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const btn      = document.getElementById("loginBtn");
+      const errorMsg = document.getElementById("errorMsg");
+
+      // Basic validation
+      if (!username || !password) {
+        showError("Please enter both username and password.");
+        return;
+      }
+
+      // Show loading state
+      btn.disabled    = true;
+      btn.innerHTML   = '<span class="spinner"></span>Signing in...';
+      errorMsg.style.display = "none";
+
+      try {
+        // FastAPI OAuth2 expects form data not JSON
+        const formData = new FormData();
+        formData.append("username", username);
+        formData.append("password", password);
+
+        const response = await fetch(`${API}/auth/login`, {
+          method: "POST",
+          body:   formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showError(data.detail || "Login failed. Please check your credentials.");
+          return;
+        }
+
+        // Save token and username to localStorage
+        localStorage.setItem("dt_token",    data.access_token);
+        localStorage.setItem("dt_user",     data.username);
+        localStorage.setItem("dt_expires",  Date.now() + (data.expires_in * 1000));
+
+        // Redirect to dashboard
+        window.location.href = "dashboard.html";
+
+      } catch (err) {
+        showError("Cannot connect to server. Make sure the API is running.");
+      } finally {
+        btn.disabled  = false;
+        btn.innerHTML = "Sign In";
+      }
+    }
+
+    function showError(message) {
+      const errorMsg = document.getElementById("errorMsg");
+      errorMsg.textContent       = message;
+      errorMsg.style.display     = "block";
+    }
+  </script>
+
+</body>
+</html>
