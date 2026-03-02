@@ -40,11 +40,11 @@ REST API (FastAPI) + Dashboard (HTML/JS)
 
 ## 👥 Team
 
-| Member | Role |
-|--------|------|
-| Member 1 | Patient Database & Data Pipeline |
-| Member 2 | ML Model, Treatment Simulator, API |
-| Member 3 | Scoring Engine, Auth, Frontend |
+| Member               | Role                                         |
+|----------------------|----------------------------------------------|
+| Suvam Kar            | Patient Database & Data Pipeline  |
+| Rahul Ganguly (lead) | ML Model, Treatment Simulator, API |
+| Sayan Das            | Scoring Engine, API, Auth      |
 
 ---
 
