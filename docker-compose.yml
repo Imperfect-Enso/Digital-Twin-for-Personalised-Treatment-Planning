@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  backend:
+    build: .
+    container_name: digital-twin-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./digital_twin.db:/app/digital_twin.db   # persist DB between restarts
+      - ./logs:/app/logs                          # expose logs to host
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/quick')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+# Usage:
+#   docker compose up --build          # first time
+#   docker compose up -d               # background
+#   docker compose logs -f backend     # tail logs
+#   docker compose down                # stop

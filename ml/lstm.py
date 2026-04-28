@@ -3,18 +3,7 @@ from tensorflow.keras import layers, Model
 
 
 def build_lstm_model(timesteps=12, num_features=4):
-    """
-    Builds and returns a compiled LSTM model for patient severity prediction.
 
-    Architecture: Input → LSTM(64) → LSTM(32) → Dense(16) → Dropout(0.2) → Output(1)
-
-    Args:
-        timesteps:    Number of monthly readings per patient (default 12)
-        num_features: Number of tracked vitals — BP, glucose, HR, inflammation (default 4)
-
-    Returns:
-        A compiled Keras model ready for training.
-    """
     inputs = tf.keras.Input(shape=(timesteps, num_features))
 
     # First LSTM layer — return_sequences=True passes the full sequence to the next layer

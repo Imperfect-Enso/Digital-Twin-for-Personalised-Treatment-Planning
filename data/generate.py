@@ -4,19 +4,7 @@ import os
 
 
 def generate_patient_data(num_patients=200, timesteps=12):
-    """
-    Generates synthetic longitudinal patient health records for model training.
 
-    Each patient is randomly assigned mild (0) or severe (1) status.
-    Severe patients worsen progressively each month; mild patients remain stable.
-
-    Args:
-        num_patients: Number of synthetic patients to generate (default 200)
-        timesteps:    Monthly readings per patient (default 12)
-
-    Returns:
-        DataFrame saved to data/patients.csv
-    """
     records = []
 
     for patient_id in range(num_patients):

@@ -5,14 +5,16 @@ from fastapi.openapi.utils import get_openapi
 
 from api.simulation_routes import router as sim_router
 from api.comparison_routes  import router as cmp_router
-from middleware.auth import login_user, TokenResponse
-from db.database import init_db
+from api.health             import router as health_router       # NEW
+from middleware.auth        import login_user, TokenResponse
+from middleware.logging     import RequestLoggingMiddleware, log  # NEW
+from db.database            import init_db
 
 
 app = FastAPI(
     title="Digital Twin — Personalized Treatment API",
-    version="1.0.0",
-    contact={"name": "Team NextGenHack"}
+    version="2.0.0",
+    contact={"name": "Team Null2Bit"}
 )
 
 
@@ -23,7 +25,7 @@ def custom_openapi():
 
     openapi_schema = get_openapi(
         title="Digital Twin — Personalized Treatment API",
-        version="1.0.0",
+        version="2.0.0",
         description="""
 ## Digital Twin ML Backend
 
@@ -47,12 +49,12 @@ how different treatments will affect their health over time.
 ### What Each Group Does
 - **/patient** — Feed in vitals, get a severity score or simulate a treatment
 - **/compare** — Run all treatments and get them ranked best to worst
+- **/health**  — Liveness probe and full system status
 - **/auth**    — Login and token management
         """,
         routes=app.routes,
     )
 
-    # Add OAuth2 security scheme — makes lock icon appear in Swagger
     openapi_schema["components"]["securitySchemes"] = {
         "OAuth2PasswordBearer": {
             "type": "oauth2",
@@ -65,7 +67,6 @@ how different treatments will affect their health over time.
         }
     }
 
-    # Apply security to all endpoints globally
     for path in openapi_schema["paths"].values():
         for method in path.values():
             method["security"] = [{"OAuth2PasswordBearer": []}]
@@ -81,9 +82,12 @@ app.openapi = custom_openapi
 @app.on_event("startup")
 def startup():
     init_db()
+    log.info("Digital Twin API started — visit /docs to explore endpoints")
 
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+# ── Middleware (order matters: outermost runs first on request) ────────────────
+app.add_middleware(RequestLoggingMiddleware)   # NEW — logs every request
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -94,6 +98,7 @@ app.add_middleware(
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(health_router)   # NEW — /health and /health/quick
 app.include_router(sim_router)
 app.include_router(cmp_router)
 
@@ -114,7 +119,7 @@ def login(form: OAuth2PasswordRequestForm = Depends()):
     return login_user(form)
 
 
-# ── Health Check ──────────────────────────────────────────────────────────────
+# ── Root ──────────────────────────────────────────────────────────────────────
 @app.get(
     "/",
     tags=["Health Check"],
@@ -123,7 +128,9 @@ def login(form: OAuth2PasswordRequestForm = Depends()):
 def root():
     return {
         "status":  "online",
+        "version": "2.0.0",
         "message": "Digital Twin API is up and running!",
         "docs":    "Visit /docs to explore and test all endpoints",
+        "health":  "GET /health for system status",
         "login":   "POST /auth/login with your credentials to get started"
     }
